@@ -33,7 +33,8 @@ module OrganIds =
         | "esophagus" -> Ok Esophagus
         | "trachea" -> Ok Trachea
         | "sacrum" -> Ok Sacrum
-        | other -> Error (sprintf "Unknown organ key '%s'." other)
+        | other when Regex.IsMatch(other, "^[a-z][a-z0-9_]*$") -> Ok (OtherOrgan other)
+        | other -> Error (sprintf "Invalid organ key '%s'." other)
 
     /// Converts a recognized anatomical identity to a canonical key.
     let format =
@@ -103,10 +104,12 @@ module StructureNames =
     /// Checks for excluded PRV, optimization, ring, and evaluation modifiers.
     let excludedModifier (dictionary: NamingDictionary) actualId =
         let candidates = tokens actualId
+        let fullName = compact actualId
         dictionary.Convention.ExcludedModifierTokens
         |> List.tryFind (fun modifier ->
             let key = compact modifier
-            candidates |> List.exists (fun token -> token = key))
+            candidates |> List.exists (fun token -> token = key || Regex.IsMatch(token, "^" + Regex.Escape(key) + "[0-9]+$")) ||
+            (fullName.Length > key.Length && fullName.EndsWith(key, StringComparison.Ordinal)))
         
     /// Checks a base alias with optional leading/trailing laterality.
     let matchesAlias (dictionary: NamingDictionary) organ actualId alias =
