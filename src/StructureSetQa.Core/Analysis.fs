@@ -13,14 +13,14 @@ module Analysis =
         |> Option.defaultValue Missing
 
     /// Reads the minimum measured clearance from the CT grid.
-    let minimumGridClearance geometry =
+    let minimumGridClearance (geometry: ContourGeometry) =
         match geometry.Coverage with
         | NotAssessed reason -> Error reason
         | MeasuredGridClearances [] -> Error "CT boundary clearances are unavailable."
         | MeasuredGridClearances values -> values |> List.map snd |> List.min |> Ok
 
     /// Checks whether one contour has sufficient scan-boundary clearance.
-    let checkSingleCoverage requirement geometry =
+    let checkSingleCoverage (requirement: ComparisonCoverage) (geometry: ContourGeometry) =
         match requirement with
         | AnyObservedExtent -> Ok ()
         | BothClearOfGridEdges margin ->
@@ -30,14 +30,14 @@ module Analysis =
                 else Error "Contour approaches the CT boundary; whole-organ center may be biased.")
 
     /// Checks that every contour used in a relationship meets its coverage prerequisite.
-    let checkCoverage requirement geometries =
+    let checkCoverage (requirement: ComparisonCoverage) (geometries: ContourGeometry list) =
         geometries
         |> List.map (checkSingleCoverage requirement)
         |> List.tryPick (function Error reason -> Some reason | Ok () -> None)
         |> function Some reason -> Error reason | None -> Ok ()
 
     /// Gets the requested structure location using original source XYZ coordinates.
-    let measuredLocation measure geometry =
+    let measuredLocation (measure: LocationMeasure) (geometry: ContourGeometry) =
         match measure with
         | StructureCenterPoint -> geometry.Center
         | BoundingBoxCentre ->
@@ -58,7 +58,7 @@ module Analysis =
         | InferiorTo -> second.Z - first.Z
 
     /// Evaluates topology and observed CT grid-edge proximity for one structure.
-    let evaluateIntrinsic contour rule =
+    let evaluateIntrinsic (contour: ContourObservation) (rule: IntrinsicRule) =
         match rule, contour with
         | MustBePresent, Missing
         | MustBePresent, Empty -> Flagged (Warning, [])
@@ -84,7 +84,7 @@ module Analysis =
                 else Flagged (Information, [BoundaryEdges (close |> List.map fst)])
 
     /// Evaluates the relationship of two existing structures.
-    let evaluateRelative (snapshot: AnatomySnapshot) rule =
+    let evaluateRelative (snapshot: AnatomySnapshot) (rule: RelativeRule) =
         match observation snapshot rule.Subject, observation snapshot rule.Reference with
         | Measured subject, Measured reference ->
             match checkCoverage rule.Coverage [subject; reference] with
@@ -108,7 +108,7 @@ module Analysis =
         | _ -> nan
 
     /// Evaluates whether one structure center is between two reference centers.
-    let evaluateBetween (snapshot: AnatomySnapshot) rule =
+    let evaluateBetween (snapshot: AnatomySnapshot) (rule: BetweenRule) =
         match observation snapshot rule.Subject,
               observation snapshot rule.First,
               observation snapshot rule.Second with
@@ -140,7 +140,7 @@ module Analysis =
         | Sacral number -> 24 + number
 
     /// Collects centers of the vertebrae actually found in the current structure set.
-    let vertebralCentres snapshot =
+    let vertebralCentres (snapshot: AnatomySnapshot) =
         snapshot.Structures
         |> Map.toList
         |> List.choose (fun (organ, item) ->
@@ -164,7 +164,7 @@ module Analysis =
             | _ -> Error "Organ center lies outside the observed labeled vertebral range."
 
     /// Evaluates the nearest vertebral center in superior-inferior distance.
-    let evaluateVertebral snapshot subject (NearestVertebraAllowed (levels, requiredCoverage)) =
+    let evaluateVertebral (snapshot: AnatomySnapshot) subject (NearestVertebraAllowed (levels, requiredCoverage)) =
         match observation snapshot subject with
         | Missing -> NotEvaluated "The structure was not found."
         | Empty -> NotEvaluated "The structure has no contour."
@@ -191,7 +191,7 @@ module Analysis =
         | other -> other
 
     /// Evaluates one organ-local rule in the context of available scan landmarks.
-    let evaluateStructureRule snapshot organ definition =
+    let evaluateStructureRule (snapshot: AnatomySnapshot) (organ: Organ) (definition: StructureRuleDefinition) =
         let outcome =
             match definition.Rule with
             | Geometry rule -> evaluateIntrinsic (observation snapshot organ) rule
@@ -201,7 +201,7 @@ module Analysis =
           Outcome = useSeverity definition.Severity outcome }
 
     /// Evaluates one structure-set relation after the entire inventory has been collected.
-    let evaluateStructureSetRule snapshot definition =
+    let evaluateStructureSetRule (snapshot: AnatomySnapshot) (definition: StructureSetRuleDefinition) =
         let subject, outcome =
             match definition.Rule with
             | RelativePosition rule -> rule.Subject, evaluateRelative snapshot rule
