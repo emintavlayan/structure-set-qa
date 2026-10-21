@@ -10,27 +10,23 @@ open Domain
 /// Reads immutable contour and CT observations from a live Eclipse ScriptContext.
 module EsapiReader =
 
-    /// Converts DICOM LPS coordinates into anterior-positive, left-positive patient coordinates.
-    let fromLps x y z =
-        { AnteriorMm = -y; LeftMm = x; SuperiorMm = z }
+    /// Copies an ESAPI VVector's original DICOM patient XYZ coordinates without remapping.
+    let fromVVector (vector: VVector) =
+        { X = vector.x; Y = vector.y; Z = vector.z }
 
-    /// Converts the ESAPI center point into patient coordinates.
-    let fromVVector (vector: VVector) = fromLps vector.x vector.y vector.z
-
-    /// Converts a mesh's axis-aligned DICOM bounding box into patient coordinates.
+    /// Copies the original XYZ bounds of the ESAPI structure mesh.
     let fromMeshBounds (box: Rect3D) =
-        { Minimum = fromLps box.X (box.Y + box.SizeY) box.Z
-          Maximum = fromLps (box.X + box.SizeX) box.Y (box.Z + box.SizeZ) }
+        { Minimum = { X = box.X; Y = box.Y; Z = box.Z }
+          Maximum = { X = box.X + box.SizeX; Y = box.Y + box.SizeY; Z = box.Z + box.SizeZ } }
 
     /// Creates the physical point at a voxel-corner index, using image direction vectors.
     let imagePoint (image: Image) x y z =
         let xMm = x * image.XRes
         let yMm = y * image.YRes
         let zMm = z * image.ZRes
-        fromLps
-            (image.Origin.x + xMm * image.XDirection.x + yMm * image.YDirection.x + zMm * image.ZDirection.x)
-            (image.Origin.y + xMm * image.XDirection.y + yMm * image.YDirection.y + zMm * image.ZDirection.y)
-            (image.Origin.z + xMm * image.XDirection.z + yMm * image.YDirection.z + zMm * image.ZDirection.z)
+        { X = image.Origin.x + xMm * image.XDirection.x + yMm * image.YDirection.x + zMm * image.ZDirection.x
+          Y = image.Origin.y + xMm * image.XDirection.y + yMm * image.YDirection.y + zMm * image.ZDirection.y
+          Z = image.Origin.z + xMm * image.XDirection.z + yMm * image.YDirection.z + zMm * image.ZDirection.z }
 
     /// Computes a patient-axis-aligned envelope around all eight CT voxel-grid corners.
     let imageBounds (image: Image) =
@@ -41,13 +37,13 @@ module EsapiReader =
                         imagePoint image x y z ]
 
         { Minimum =
-            { AnteriorMm = corners |> List.minBy (fun p -> p.AnteriorMm) |> fun p -> p.AnteriorMm
-              LeftMm = corners |> List.minBy (fun p -> p.LeftMm) |> fun p -> p.LeftMm
-              SuperiorMm = corners |> List.minBy (fun p -> p.SuperiorMm) |> fun p -> p.SuperiorMm }
+            { X = corners |> List.minBy (fun p -> p.X) |> fun p -> p.X
+              Y = corners |> List.minBy (fun p -> p.Y) |> fun p -> p.Y
+              Z = corners |> List.minBy (fun p -> p.Z) |> fun p -> p.Z }
           Maximum =
-            { AnteriorMm = corners |> List.maxBy (fun p -> p.AnteriorMm) |> fun p -> p.AnteriorMm
-              LeftMm = corners |> List.maxBy (fun p -> p.LeftMm) |> fun p -> p.LeftMm
-              SuperiorMm = corners |> List.maxBy (fun p -> p.SuperiorMm) |> fun p -> p.SuperiorMm } }
+            { X = corners |> List.maxBy (fun p -> p.X) |> fun p -> p.X
+              Y = corners |> List.maxBy (fun p -> p.Y) |> fun p -> p.Y
+              Z = corners |> List.maxBy (fun p -> p.Z) |> fun p -> p.Z } }
 
     /// Checks whether the acquisition-grid directions follow patient cardinal axes.
     let isCardinalGrid (image: Image) =
@@ -64,12 +60,12 @@ module EsapiReader =
 
     /// Measures signed distances between the observed contour bounds and all six grid faces.
     let gridClearances scanBounds structureBounds =
-        [ AnteriorEdge, scanBounds.Maximum.AnteriorMm - structureBounds.Maximum.AnteriorMm
-          PosteriorEdge, structureBounds.Minimum.AnteriorMm - scanBounds.Minimum.AnteriorMm
-          LeftEdge, scanBounds.Maximum.LeftMm - structureBounds.Maximum.LeftMm
-          RightEdge, structureBounds.Minimum.LeftMm - scanBounds.Minimum.LeftMm
-          SuperiorEdge, scanBounds.Maximum.SuperiorMm - structureBounds.Maximum.SuperiorMm
-          InferiorEdge, structureBounds.Minimum.SuperiorMm - scanBounds.Minimum.SuperiorMm ]
+        [ AnteriorEdge, structureBounds.Minimum.Y - scanBounds.Minimum.Y
+          PosteriorEdge, scanBounds.Maximum.Y - structureBounds.Maximum.Y
+          LeftEdge, scanBounds.Maximum.X - structureBounds.Maximum.X
+          RightEdge, structureBounds.Minimum.X - scanBounds.Minimum.X
+          SuperiorEdge, scanBounds.Maximum.Z - structureBounds.Maximum.Z
+          InferiorEdge, structureBounds.Minimum.Z - scanBounds.Minimum.Z ]
 
     /// Reads a number-of-separate-parts method if supplied by the installed ESAPI assembly.
     let trySeparateParts (structure: Structure) =
@@ -91,14 +87,14 @@ module EsapiReader =
                     NotAssessed "The CT grid is oblique; axis-aligned envelope clearance is not reliable."
             Ok {
                 ObservedVolumeCc = structure.Volume
-                EsapiCenter = fromVVector structure.CenterPoint
+                Center = fromVVector structure.CenterPoint
                 MeshBounds = bounds
                 SeparateParts = trySeparateParts structure
                 Coverage = coverage
                 Completeness = NotEstablished
             }
 
-    /// Finds a structure using the current Siemens ID list, without fuzzy matching.
+    /// Finds a structure using configured source IDs, without fuzzy matching.
     let findStructure (structureSet: StructureSet) ids =
         structureSet.Structures
         |> Seq.tryFind (fun structure ->
