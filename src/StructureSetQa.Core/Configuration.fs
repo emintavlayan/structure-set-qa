@@ -323,10 +323,12 @@ module Configuration =
             let! names = stringList (id + ".allowed_levels") allowedNode
             let! levels = names |> List.map (vertebralLevel id) |> sequence
             if List.isEmpty levels then return! Error (id + ": allowed_levels cannot be empty.")
+            let! coverageName = text id "coverage" row
+            let! needed = coverage id coverageName
             return subject, {
                 Id = id
                 Severity = priority
-                Rule = Vertebral (NearestVertebraAllowed levels)
+                Rule = Vertebral (NearestVertebraAllowed (levels, needed))
             }
         }
 
