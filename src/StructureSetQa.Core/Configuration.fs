@@ -48,6 +48,20 @@ module Configuration =
             | :? YamlScalarNode as scalar when scalar.Value = key -> Some pair.Value
             | _ -> None)
 
+    /// Rejects misspelled or unsupported configuration keys at the relevant YAML location.
+    let allowedKeys label expected (map: YamlMappingNode) =
+        let known = Set.ofList expected
+        let names =
+            map.Children
+            |> Seq.map (fun pair ->
+                match pair.Key with
+                | :? YamlScalarNode as scalar -> scalar.Value
+                | _ -> "<nontext-key>")
+            |> Seq.toList
+        let unexpected = names |> List.filter (fun name -> not (Set.contains name known))
+        if List.isEmpty unexpected then Ok ()
+        else Error (sprintf "%s: unknown YAML field(s): %s" label (String.concat ", " unexpected))
+
     /// Requires one mapping property with an explanatory error.
     let required label key map =
         match field map key with
@@ -164,8 +178,10 @@ module Configuration =
             let! root = document "structure-ids.yaml" content
             let! settings = mapping "structure-ids.yaml" root
             let! _ = version "structure-ids.yaml" settings
+            do! allowedKeys "structure-ids.yaml" ["version"; "laterality"; "excluded_modifiers"; "vertebra_prefixes"; "structures"] settings
             let! sidesNode = required "structure-ids.yaml" "laterality" settings
             let! sides = mapping "laterality" sidesNode
+            do! allowedKeys "laterality" ["left"; "right"] sides
             let! leftNode = required "laterality" "left" sides
             let! rightNode = required "laterality" "right" sides
             let! leftTokens = stringList "laterality.left" leftNode
@@ -212,8 +228,10 @@ module Configuration =
             let! root = document "geometry.yaml" content
             let! settings = mapping "geometry.yaml" root
             let! _ = version "geometry.yaml" settings
+            do! allowedKeys "geometry.yaml" ["version"; "defaults"; "structures"] settings
             let! defaultsNode = required "geometry.yaml" "defaults" settings
             let! defaults = mapping "geometry.defaults" defaultsNode
+            do! allowedKeys "geometry.defaults" ["scan_edge_margin_mm"] defaults
             let! margin = number "geometry.defaults" "scan_edge_margin_mm" 3.0 defaults
             let! structuresNode = required "geometry.yaml" "structures" settings
             let! structures = mapping "geometry.structures" structuresNode
@@ -224,6 +242,7 @@ module Configuration =
                         let! key = scalar "geometry organ" pair.Key
                         let! identity = organ "geometry" key
                         let! settings = mapping ("geometry." + key) pair.Value
+                        do! allowedKeys ("geometry." + key) ["max_connected_parts"; "scan_edge_margin_mm"] settings
                         let! parts =
                             match field settings "max_connected_parts" with
                             | None -> Ok []
@@ -250,6 +269,12 @@ module Configuration =
         result {
             let! id = text "relationship" "id" row
             let! kind = text id "kind" row
+            let expected =
+                match kind with
+                | "relative_position" -> ["id"; "kind"; "subject"; "reference"; "direction"; "minimum_mm"; "coverage"; "severity"]
+                | "between_centres" -> ["id"; "kind"; "subject"; "first"; "second"; "axis"; "margin_mm"; "coverage"; "severity"]
+                | _ -> []
+            if not (List.isEmpty expected) then do! allowedKeys id expected row
             let! subject = organField id "subject" row
             let! severityName = text id "severity" row
             let! priority = severity id severityName
@@ -300,6 +325,7 @@ module Configuration =
             let! root = document "relationships.yaml" content
             let! settings = mapping "relationships.yaml" root
             let! _ = version "relationships.yaml" settings
+            do! allowedKeys "relationships.yaml" ["version"; "rules"] settings
             let! listNode = required "relationships.yaml" "rules" settings
             let! rows = mappingRows "relationships.rules" listNode
             return! rows |> List.map relationshipRow |> sequence
@@ -316,6 +342,7 @@ module Configuration =
     let vertebralRow (row: YamlMappingNode) =
         result {
             let! id = text "vertebral rule" "id" row
+            do! allowedKeys id ["id"; "subject"; "allowed_levels"; "coverage"; "severity"] row
             let! subject = organField id "subject" row
             let! severityName = text id "severity" row
             let! priority = severity id severityName
@@ -338,6 +365,7 @@ module Configuration =
             let! root = document "vertebrae.yaml" content
             let! settings = mapping "vertebrae.yaml" root
             let! _ = version "vertebrae.yaml" settings
+            do! allowedKeys "vertebrae.yaml" ["version"; "rules"] settings
             let! listNode = required "vertebrae.yaml" "rules" settings
             let! rows = mappingRows "vertebrae.rules" listNode
             return! rows |> List.map vertebralRow |> sequence
