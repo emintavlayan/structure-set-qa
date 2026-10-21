@@ -38,3 +38,21 @@ rules:
     margin_mm: 0
     coverage: complete_candidate
     severity: information
+
+  - id: liver.right-of-spleen
+    kind: relative_position
+    subject: liver
+    reference: spleen
+    direction: right_of
+    minimum_mm: 10
+    coverage: complete_candidate
+    severity: warning
+
+  - id: rectum.anterior-to-sacrum
+    kind: relative_position
+    subject: rectum
+    reference: sacrum
+    direction: anterior_to
+    minimum_mm: 5
+    coverage: complete_candidate
+    severity: information
