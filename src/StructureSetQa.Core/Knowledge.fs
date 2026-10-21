@@ -15,7 +15,7 @@ module Knowledge =
           Rule = Relative {
               Other = other
               Direction = direction
-              Measure = EsapiCenterPoint
+              Measure = StructureCenterPoint
               MinimumDifferenceMm = minimumDifferenceMm
               Coverage = coverage } }
 
@@ -23,7 +23,7 @@ module Knowledge =
     let vertebral id severity window =
         { Id = id; Severity = severity; Rule = Vertebral (CentreWithin window) }
 
-    /// Defines the first fixed-ID Siemens anatomical rules.
+    /// Defines initial anatomical rules using provisional, configurable structure IDs.
     let dayOne : QaKnowledge =
         { Version = 1
           Structures = [
