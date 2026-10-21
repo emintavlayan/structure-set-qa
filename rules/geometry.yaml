@@ -1,0 +1,17 @@
+# One structure at a time. Values are screening examples, not validated clinical limits.
+version: 1
+defaults:
+  scan_edge_margin_mm: 3
+structures:
+  rectum:
+    max_connected_parts: 1
+  bladder:
+    max_connected_parts: 1
+  kidney_left:
+    max_connected_parts: 1
+  kidney_right:
+    max_connected_parts: 1
+  lung_left:
+    max_connected_parts: 1
+  lung_right:
+    max_connected_parts: 1
