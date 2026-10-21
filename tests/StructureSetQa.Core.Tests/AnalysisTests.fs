@@ -8,8 +8,8 @@ open StructureSetQa
 module Fixtures =
 
     /// Creates a patient position in millimetres.
-    let point anterior left superior =
-        { AnteriorMm = anterior; LeftMm = left; SuperiorMm = superior }
+    let point x y z =
+        { X = x; Y = y; Z = z }
 
     /// Creates complete grid-clearance evidence for a synthetic contour.
     let coverage distance =
@@ -18,11 +18,11 @@ module Fixtures =
         |> MeasuredGridClearances
 
     /// Creates a contour observation with controlled center, component count and scan clearance.
-    let measured anterior left superior parts clearance =
-        let center = point anterior left superior
+    let measured x y z parts clearance =
+        let center = point x y z
         Measured {
             ObservedVolumeCc = 100.0
-            EsapiCenter = center
+            Center = center
             MeshBounds = { Minimum = center; Maximum = center }
             SeparateParts = Some parts
             Coverage = coverage clearance
@@ -48,13 +48,13 @@ module AnalysisTests =
     let ``Kidney laterality passes for expected geometry`` () =
         let snapshot =
             Fixtures.snapshot [
-                Fixtures.structure (Kidney Left) (Fixtures.measured 0.0 70.0 0.0 1 20.0)
-                Fixtures.structure (Kidney Right) (Fixtures.measured 0.0 -70.0 0.0 1 20.0)
+                Fixtures.structure (Kidney Left) (Fixtures.measured 70.0 0.0 0.0 1 20.0)
+                Fixtures.structure (Kidney Right) (Fixtures.measured -70.0 0.0 0.0 1 20.0)
             ]
         let rule = {
             Other = Kidney Right
             Direction = LeftOf
-            Measure = EsapiCenterPoint
+            Measure = StructureCenterPoint
             MinimumDifferenceMm = 10.0
             Coverage = AnyObservedExtent
         }
@@ -75,16 +75,54 @@ module AnalysisTests =
     let ``CT boundary prevents coverage-dependent center comparison`` () =
         let snapshot =
             Fixtures.snapshot [
-                Fixtures.structure (Kidney Left) (Fixtures.measured 0.0 60.0 60.0 1 0.5)
-                Fixtures.structure Rectum (Fixtures.measured 10.0 0.0 -120.0 1 20.0)
+                Fixtures.structure (Kidney Left) (Fixtures.measured 60.0 0.0 60.0 1 0.5)
+                Fixtures.structure Rectum (Fixtures.measured 0.0 10.0 -120.0 1 20.0)
             ]
         let rule = {
             Other = Rectum
             Direction = SuperiorTo
-            Measure = EsapiCenterPoint
+            Measure = StructureCenterPoint
             MinimumDifferenceMm = 20.0
             Coverage = BothClearOfGridEdges 3.0
         }
         match Analysis.evaluateRelative snapshot (Kidney Left) rule with
         | NotEvaluated _ -> ()
         | other -> failwithf "Expected no evaluation, got %A" other
+
+    /// Checks that positive source Y is posterior, without any coordinate transformation.
+    [<Fact>]
+    let ``Rectum posterior to bladder uses positive Y`` () =
+        let snapshot =
+            Fixtures.snapshot [
+                Fixtures.structure Rectum (Fixtures.measured 0.0 55.0 -100.0 1 20.0)
+                Fixtures.structure Bladder (Fixtures.measured 0.0 -20.0 -90.0 1 20.0)
+            ]
+        let rule = {
+            Other = Bladder
+            Direction = PosteriorTo
+            Measure = StructureCenterPoint
+            MinimumDifferenceMm = 5.0
+            Coverage = AnyObservedExtent
+        }
+        match Analysis.evaluateRelative snapshot Rectum rule with
+        | Passed [ObservedDifferenceMm delta] when delta = 75.0 -> ()
+        | other -> failwithf "Expected posterior relation to pass, got %A" other
+
+    /// Checks that the right kidney cannot satisfy a left-of rule.
+    [<Fact>]
+    let ``Right-sided structure fails left-of comparison`` () =
+        let snapshot =
+            Fixtures.snapshot [
+                Fixtures.structure (Kidney Left) (Fixtures.measured -50.0 0.0 0.0 1 20.0)
+                Fixtures.structure (Kidney Right) (Fixtures.measured 50.0 0.0 0.0 1 20.0)
+            ]
+        let rule = {
+            Other = Kidney Right
+            Direction = LeftOf
+            Measure = StructureCenterPoint
+            MinimumDifferenceMm = 10.0
+            Coverage = AnyObservedExtent
+        }
+        match Analysis.evaluateRelative snapshot (Kidney Left) rule with
+        | Flagged (_, [ObservedDifferenceMm delta]) when delta = -100.0 -> ()
+        | other -> failwithf "Expected laterality warning, got %A" other
