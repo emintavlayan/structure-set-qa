@@ -1,0 +1,29 @@
+# Anatomical center checks, not required contour extents.
+# The nearest vertebra is selected by |organ_center.Z - vertebra_center.Z|.
+# The referenced vertebral range must bracket the organ center, or no check is made.
+# These broad examples are unvalidated and should be adjusted by clinical reviewers.
+version: 1
+rules:
+  - id: kidney-left.vertebral-center
+    subject: kidney_left
+    allowed_levels: [T11, T12, L1, L2, L3, L4]
+    coverage: complete_candidate
+    severity: information
+
+  - id: kidney-right.vertebral-center
+    subject: kidney_right
+    allowed_levels: [T11, T12, L1, L2, L3, L4]
+    coverage: complete_candidate
+    severity: information
+
+  - id: heart.vertebral-center
+    subject: heart
+    allowed_levels: [T3, T4, T5, T6, T7, T8, T9, T10]
+    coverage: complete_candidate
+    severity: information
+
+  - id: rectum.vertebral-center
+    subject: rectum
+    allowed_levels: [L4, L5, S1, S2, S3, S4, S5]
+    coverage: complete_candidate
+    severity: information
