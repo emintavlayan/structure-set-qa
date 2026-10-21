@@ -249,9 +249,12 @@ module Configuration =
                             | Some node ->
                                 positiveInteger ("geometry." + key + ".max_connected_parts") node
                                 |> Result.map (fun count ->
-                                    [({ Id = key + ".connected-parts"
-                                       Severity = Warning
-                                       Rule = Geometry (MaximumSeparateParts count) }: StructureRuleDefinition)])
+                                    let rule : StructureRuleDefinition = {
+                                        Id = key + ".connected-parts"
+                                        Severity = Warning
+                                        Rule = Geometry (MaximumSeparateParts count)
+                                    }
+                                    [rule])
                         let! edge = number ("geometry." + key) "scan_edge_margin_mm" margin settings
                         let checks : StructureRuleDefinition = {
                             Id = key + ".scan-edge"
