@@ -94,60 +94,80 @@ module EsapiReader =
                 Completeness = NotEstablished
             }
 
-    /// Finds a structure using configured source IDs, without fuzzy matching.
-    let findStructure (structureSet: StructureSet) ids =
-        structureSet.Structures
-        |> Seq.tryFind (fun structure ->
-            ids |> List.exists (fun id -> String.Equals(structure.Id, id, StringComparison.OrdinalIgnoreCase)))
+    /// Converts one named structure into a domain observation without modifying its contour.
+    let readOrgan scan organ (structure: Structure) =
+        let contour =
+            try
+                if structure.IsEmpty then Empty
+                else
+                    match readGeometry scan structure with
+                    | Ok geometry -> Measured geometry
+                    | Error message -> ExtractionFailed message
+            with error -> ExtractionFailed error.Message
+        { Organ = organ; ActualId = Some structure.Id; Contour = contour }
 
-    /// Reads one expected organ while isolating failures to that organ.
-    let readOrgan scan (structureSet: StructureSet) (definition: StructureDefinition) =
-        match findStructure structureSet definition.SourceIds with
-        | None -> { Organ = definition.Organ; ActualId = None; Contour = Missing }
-        | Some structure ->
-            let contour =
-                try
-                    if structure.IsEmpty then Empty
-                    else
-                        match readGeometry scan structure with
-                        | Ok geometry -> Measured geometry
-                        | Error message -> ExtractionFailed message
-                with exceptionInfo -> ExtractionFailed exceptionInfo.Message
-            { Organ = definition.Organ
-              ActualId = Some structure.Id
-              Contour = contour }
-
-    /// Validates and reads the structure set selected in the live ScriptContext.
+    /// Validates and inventories every structure before rule evaluation.
     let readSnapshot (scriptContext: ScriptContext) (knowledge: QaKnowledge) : Result<AnatomySnapshot, string> =
         result {
             let! structureSet =
-                if isNull scriptContext then Error "No active Eclipse ScriptContext."
+                if isNull scriptContext then Error "No active ESAPI ScriptContext."
                 elif isNull scriptContext.StructureSet then Error "No active structure set."
                 else Ok scriptContext.StructureSet
 
             let! image =
-                if isNull structureSet.Image then Error "The structure set has no associated image."
+                if isNull structureSet.Image then Error "The current structure set has no associated CT image."
                 else Ok structureSet.Image
 
             let! _ =
                 if image.XSize > 0 && image.YSize > 0 && image.ZSize > 0 then Ok ()
-                else Error "The image has invalid 3D grid dimensions."
+                else Error "The associated CT image has invalid dimensions."
 
-            let scan = {
-                ImageId = image.Id
-                GridBounds = imageBounds image
-                AxisAlignedWithPatient = isCardinalGrid image
-            }
+            let! scan =
+                try
+                    Ok {
+                        ImageId = image.Id
+                        GridBounds = imageBounds image
+                        AxisAlignedWithPatient = isCardinalGrid image
+                    }
+                with error -> Error ("CT grid extraction failed: " + error.Message)
+
+            let sourceStructures = structureSet.Structures |> Seq.toList
+            let inventory =
+                sourceStructures
+                |> List.map (fun item -> item.Id)
+                |> StructureNames.inventory knowledge.Naming
+
+            let duplicateKeys =
+                inventory.DuplicateOrgans
+                |> List.map fst
+                |> Set.ofList
+
+            let knownById =
+                inventory.Items
+                |> List.choose (fun item ->
+                    match item.Match with
+                    | Recognized organ -> Some (item.ActualId, organ)
+                    | _ -> None)
+                |> Map.ofList
 
             let observations =
-                knowledge.Structures
-                |> List.map (fun definition ->
-                    definition.Organ, readOrgan scan structureSet definition)
+                sourceStructures
+                |> List.choose (fun structure ->
+                    match Map.tryFind structure.Id knownById with
+                    | None -> None
+                    | Some organ when Set.contains organ duplicateKeys ->
+                        Some (organ, {
+                            Organ = organ
+                            ActualId = Some structure.Id
+                            Contour = ExtractionFailed "Several structure IDs resolve to this anatomical identity."
+                        })
+                    | Some organ -> Some (organ, readOrgan scan organ structure))
                 |> Map.ofList
 
             return {
                 StructureSetId = structureSet.UID
                 Scan = scan
+                Inventory = inventory
                 Structures = observations
             }
         }
