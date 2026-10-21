@@ -1,0 +1,40 @@
+# Rules apply only if all required contours exist.
+# X increases leftward; Y increases posteriorly; Z increases superiorly (ESAPI/DICOM).
+version: 1
+rules:
+  - id: kidney-left.left-of-right
+    kind: relative_position
+    subject: kidney_left
+    reference: kidney_right
+    direction: left_of
+    minimum_mm: 10
+    coverage: observed
+    severity: warning
+
+  - id: kidney-left.above-rectum
+    kind: relative_position
+    subject: kidney_left
+    reference: rectum
+    direction: superior_to
+    minimum_mm: 20
+    coverage: complete_candidate
+    severity: warning
+
+  - id: rectum.posterior-to-bladder
+    kind: relative_position
+    subject: rectum
+    reference: bladder
+    direction: posterior_to
+    minimum_mm: 5
+    coverage: complete_candidate
+    severity: warning
+
+  - id: heart.between-lungs
+    kind: between_centres
+    subject: heart
+    first: lung_left
+    second: lung_right
+    axis: x
+    margin_mm: 0
+    coverage: complete_candidate
+    severity: information
