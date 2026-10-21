@@ -124,7 +124,7 @@ module Domain =
 
     /// Represents a center's permitted location among identified vertebral levels.
     type VertebralRule =
-        | NearestVertebraAllowed of allowed: VertebralLevel list
+        | NearestVertebraAllowed of allowed: VertebralLevel list * coverage: ComparisonCoverage
 
     /// Represents rules that need only one structure and optionally vertebral landmarks.
     type StructureRule =
