@@ -19,10 +19,10 @@ module Domain =
     and VertebralLevel =
         | Cervical of int | Thoracic of int | Lumbar of int | Sacral of int
 
-    /// Represents an anatomical point in millimetres: anterior-positive, left-positive, superior-positive.
-    type PatientPoint = { AnteriorMm: float; LeftMm: float; SuperiorMm: float }
+    /// Represents a point in source patient XYZ coordinates (millimetres), without axis remapping.
+    type PatientPoint = { X: float; Y: float; Z: float }
 
-    /// Represents a patient-axis-aligned bounding box in millimetres.
+    /// Represents a source-coordinate-axis-aligned bounding box in millimetres.
     type PatientBounds = { Minimum: PatientPoint; Maximum: PatientPoint }
 
     /// Represents an observed contour's relationship to the scanned image grid.
@@ -30,7 +30,7 @@ module Domain =
         | NotAssessed of reason: string
         | MeasuredGridClearances of (ScanEdge * float) list
 
-    /// Represents one physical boundary of the CT acquisition grid.
+    /// Represents a patient-anatomical boundary of the acquired CT grid.
     and ScanEdge =
         | AnteriorEdge | PosteriorEdge | LeftEdge | RightEdge
         | SuperiorEdge | InferiorEdge
@@ -45,7 +45,7 @@ module Domain =
     /// Represents a measured nonempty structure, not necessarily the whole organ.
     type ContourGeometry = {
         ObservedVolumeCc: float
-        EsapiCenter: PatientPoint
+        Center: PatientPoint
         MeshBounds: PatientBounds
         SeparateParts: int option
         Coverage: ScanCoverage
@@ -59,7 +59,7 @@ module Domain =
         | Measured of ContourGeometry
         | ExtractionFailed of message: string
 
-    /// Represents one extracted Eclipse structure without retaining the ESAPI object.
+    /// Represents one extracted structure without retaining adapter-specific objects.
     type StructureObservation = {
         Organ: Organ
         ActualId: string option
@@ -82,7 +82,7 @@ module Domain =
 
     /// Represents a choice of measured structure location.
     type LocationMeasure =
-        | EsapiCenterPoint
+        | StructureCenterPoint
         | BoundingBoxCentre
         | SuperiorExtent
         | InferiorExtent
@@ -136,7 +136,7 @@ module Domain =
         Rule: StructureRule
     }
 
-    /// Represents what one structure is, how Siemens names it, and its anatomical rules.
+    /// Represents a structure identity, accepted source IDs, and its anatomical rules.
     type StructureDefinition = {
         Organ: Organ
         SourceIds: string list
@@ -168,8 +168,10 @@ module Domain =
         Outcome: RuleOutcome
     }
 
-    /// Represents an initial structure-set review or a future post-planning review.
-    type ReviewStage = BeforePlanning | AfterPlanning of planId: string
+    /// Represents initial or extended structure-set checks, without plan or dose QA.
+    type ReviewStage =
+        | InitialContourReview
+        | ExtendedStructureReview
 
     /// Represents the complete result of one clinical QA execution.
     type QaReport = {
