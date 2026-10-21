@@ -22,25 +22,25 @@ module Analysis =
     /// Gets the anatomical point selected by a position rule.
     let measuredLocation measure (geometry: ContourGeometry) =
         match measure with
-        | EsapiCenterPoint -> geometry.EsapiCenter
+        | StructureCenterPoint -> geometry.Center
         | BoundingBoxCentre ->
-            { AnteriorMm = (geometry.MeshBounds.Minimum.AnteriorMm + geometry.MeshBounds.Maximum.AnteriorMm) / 2.0
-              LeftMm = (geometry.MeshBounds.Minimum.LeftMm + geometry.MeshBounds.Maximum.LeftMm) / 2.0
-              SuperiorMm = (geometry.MeshBounds.Minimum.SuperiorMm + geometry.MeshBounds.Maximum.SuperiorMm) / 2.0 }
+            { X = (geometry.MeshBounds.Minimum.X + geometry.MeshBounds.Maximum.X) / 2.0
+              Y = (geometry.MeshBounds.Minimum.Y + geometry.MeshBounds.Maximum.Y) / 2.0
+              Z = (geometry.MeshBounds.Minimum.Z + geometry.MeshBounds.Maximum.Z) / 2.0 }
         | SuperiorExtent ->
-            { geometry.EsapiCenter with SuperiorMm = geometry.MeshBounds.Maximum.SuperiorMm }
+            { geometry.Center with Z = geometry.MeshBounds.Maximum.Z }
         | InferiorExtent ->
-            { geometry.EsapiCenter with SuperiorMm = geometry.MeshBounds.Minimum.SuperiorMm }
+            { geometry.Center with Z = geometry.MeshBounds.Minimum.Z }
 
     /// Calculates signed anatomical separation, positive when the rule's direction holds.
     let signedDifference direction first second =
         match direction with
-        | AnteriorTo -> first.AnteriorMm - second.AnteriorMm
-        | PosteriorTo -> second.AnteriorMm - first.AnteriorMm
-        | LeftOf -> first.LeftMm - second.LeftMm
-        | RightOf -> second.LeftMm - first.LeftMm
-        | SuperiorTo -> first.SuperiorMm - second.SuperiorMm
-        | InferiorTo -> second.SuperiorMm - first.SuperiorMm
+        | AnteriorTo -> second.Y - first.Y
+        | PosteriorTo -> first.Y - second.Y
+        | LeftOf -> first.X - second.X
+        | RightOf -> second.X - first.X
+        | SuperiorTo -> first.Z - second.Z
+        | InferiorTo -> second.Z - first.Z
 
     /// Checks whether the supplied scan coverage is adequate for a center comparison.
     let hasRequiredCoverage requirement first second =
