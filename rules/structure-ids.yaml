@@ -1,0 +1,27 @@
+# Organ names are local conventions, not a vendor contract.
+# The left/right pairs intentionally share a base name. The resolver reads side tokens.
+version: 1
+laterality:
+  left: [L, LT, LEFT, SIN, VENSTRE, V]
+  right: [R, RT, RIGHT, DXT, HOJRE, H]
+excluded_modifiers: [PRV, OPT, EVAL, RING]
+vertebra_prefixes: [VERTEBRA, VERTEBRALBODY, VB]
+structures:
+  rectum: [Rectum, Rect, Rektum]
+  bladder: [Bladder, UrinaryBladder, Blaere]
+  kidney_left: [Kidney, Ren, Nyre]
+  kidney_right: [Kidney, Ren, Nyre]
+  lung_left: [Lung, Lunge]
+  lung_right: [Lung, Lunge]
+  heart: [Heart, Hjerte]
+  liver: [Liver, Lever]
+  spleen: [Spleen, Milt]
+  sacrum: [Sacrum]
+  spinal_cord: [SpinalCord, Spinal_Cord, Medulla]
+  esophagus: [Esophagus, Oesophagus]
+  femoral_head_left: [FemoralHead, Femoral Head, Proximal Femur]
+  femoral_head_right: [FemoralHead, Femoral Head, Proximal Femur]
+  prostate: [Prostate]
+  seminal_vesicles: [SeminalVesicles]
+  parotid_left: [Parotid]
+  parotid_right: [Parotid]
