@@ -27,3 +27,9 @@ rules:
     allowed_levels: [L4, L5, S1, S2, S3, S4, S5]
     coverage: complete_candidate
     severity: information
+
+  - id: liver.vertebral-center
+    subject: liver
+    allowed_levels: [T7, T8, T9, T10, T11, T12, L1, L2]
+    coverage: complete_candidate
+    severity: information
