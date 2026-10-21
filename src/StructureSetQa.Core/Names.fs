@@ -10,7 +10,7 @@ open Domain
 module OrganIds =
 
     /// Parses a canonical rulebook key into an anatomical identity.
-    let parse key : Result<Organ, string> =
+    let parse (key: string) : Result<Organ, string> =
         match key.Trim().ToLowerInvariant() with
         | "rectum" -> Ok Rectum
         | "bladder" -> Ok Bladder
@@ -102,7 +102,7 @@ module StructureNames =
             level |> Option.map Vertebra
 
     /// Checks for excluded PRV, optimization, ring, and evaluation modifiers.
-    let excludedModifier (dictionary: NamingDictionary) actualId =
+    let excludedModifier (dictionary: NamingDictionary) (actualId: string) =
         let candidates = tokens actualId
         let fullName = compact actualId
         dictionary.Convention.ExcludedModifierTokens
@@ -112,7 +112,7 @@ module StructureNames =
             (fullName.Length > key.Length && fullName.EndsWith(key, StringComparison.Ordinal)))
         
     /// Checks a base alias with optional leading/trailing laterality.
-    let matchesAlias (dictionary: NamingDictionary) organ actualId alias =
+    let matchesAlias (dictionary: NamingDictionary) organ (actualId: string) (alias: string) =
         let actual = compact actualId
         let baseName = compact alias
         match OrganIds.side organ with
@@ -128,7 +128,7 @@ module StructureNames =
                 actual = baseName + suffix || actual = suffix + baseName)
 
     /// Resolves one name without guessing from partial substrings or fuzzy similarity.
-    let resolve (dictionary: NamingDictionary) actualId =
+    let resolve (dictionary: NamingDictionary) (actualId: string) =
         match excludedModifier dictionary actualId with
         | Some modifier -> ExcludedModifier modifier
         | None ->

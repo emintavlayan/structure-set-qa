@@ -35,7 +35,7 @@ module Configuration =
             Error (sprintf "%s: YAML syntax error: %s" filename error.Message)
 
     /// Requires a YAML mapping at a documented location.
-    let mapping label node =
+    let mapping label (node: YamlNode) =
         match node with
         | :? YamlMappingNode as value -> Ok value
         | _ -> Error (sprintf "%s must be a YAML mapping." label)
@@ -69,7 +69,7 @@ module Configuration =
         | None -> Error (sprintf "%s: missing '%s'." label key)
 
     /// Requires a nonblank scalar string.
-    let scalar label node =
+    let scalar label (node: YamlNode) =
         match node with
         | :? YamlScalarNode as value when not (String.IsNullOrWhiteSpace value.Value) -> Ok value.Value
         | _ -> Error (sprintf "%s must be nonempty text." label)
@@ -107,7 +107,7 @@ module Configuration =
         }
 
     /// Parses a one-dimensional list of strings.
-    let stringList label node =
+    let stringList label (node: YamlNode) =
         match node with
         | :? YamlSequenceNode as items ->
             items.Children
@@ -126,7 +126,7 @@ module Configuration =
         }
 
     /// Parses a severity description used in rule reports.
-    let severity label value =
+    let severity label (value: string) =
         match value.ToLowerInvariant() with
         | "information" -> Ok Information
         | "warning" -> Ok Warning
@@ -134,14 +134,14 @@ module Configuration =
         | _ -> Error (sprintf "%s: unknown severity '%s'." label value)
 
     /// Parses an explicit coverage prerequisite for spatial rules.
-    let coverage label value =
+    let coverage label (value: string) =
         match value.ToLowerInvariant() with
         | "observed" -> Ok AnyObservedExtent
         | "complete_candidate" -> Ok (BothClearOfGridEdges 3.0)
         | _ -> Error (sprintf "%s: coverage must be 'observed' or 'complete_candidate'." label)
 
     /// Parses an anatomical direction keyword.
-    let direction label value =
+    let direction label (value: string) =
         match value.ToLowerInvariant() with
         | "left_of" -> Ok LeftOf
         | "right_of" -> Ok RightOf
@@ -152,7 +152,7 @@ module Configuration =
         | _ -> Error (sprintf "%s: unsupported direction '%s'." label value)
 
     /// Parses a canonical organ key, including additional local identities.
-    let organ label key =
+    let organ label (key: string) =
         OrganIds.parse key |> Result.mapError (fun reason -> sprintf "%s: %s" label reason)
 
     /// Parses one required organ property from an SS-level rule.
@@ -163,7 +163,7 @@ module Configuration =
         }
 
     /// Reads a YAML sequence of mapping entries.
-    let mappingRows label node =
+    let mappingRows label (node: YamlNode) =
         match node with
         | :? YamlSequenceNode as entries ->
             entries.Children
@@ -223,7 +223,7 @@ module Configuration =
         }
 
     /// Converts per-organ topology and scan-boundary screening rules.
-    let geometry content : Result<(Organ * StructureRuleDefinition list) list, string> =
+    let geometry (content: string) : Result<(Organ * StructureRuleDefinition list) list, string> =
         result {
             let! root = document "geometry.yaml" content
             let! settings = mapping "geometry.yaml" root
@@ -249,11 +249,14 @@ module Configuration =
                             | Some node ->
                                 positiveInteger ("geometry." + key + ".max_connected_parts") node
                                 |> Result.map (fun count ->
-                                    [{ Id = key + ".connected-parts"
-                                       Severity = Warning
-                                       Rule = Geometry (MaximumSeparateParts count) }])
+                                    let rule : StructureRuleDefinition = {
+                                        Id = key + ".connected-parts"
+                                        Severity = Warning
+                                        Rule = Geometry (MaximumSeparateParts count)
+                                    }
+                                    [rule])
                         let! edge = number ("geometry." + key) "scan_edge_margin_mm" margin settings
-                        let checks = {
+                        let checks : StructureRuleDefinition = {
                             Id = key + ".scan-edge"
                             Severity = Information
                             Rule = Geometry (ReportGridEdgeProximity edge)
@@ -265,7 +268,7 @@ module Configuration =
         }
 
     /// Converts one clinician-written relationship into a typed SS-level rule.
-    let relationshipRow (row: YamlMappingNode) =
+    let relationshipRow (row: YamlMappingNode) : Result<StructureSetRuleDefinition, string> =
         result {
             let! id = text "relationship" "id" row
             let! kind = text id "kind" row
@@ -339,7 +342,7 @@ module Configuration =
         | _ -> Error (sprintf "%s: invalid vertebral level '%s'." label name)
 
     /// Converts one nearest-vertebra rule into a structure-level assertion.
-    let vertebralRow (row: YamlMappingNode) =
+    let vertebralRow (row: YamlMappingNode) : Result<Organ * StructureRuleDefinition, string> =
         result {
             let! id = text "vertebral rule" "id" row
             do! allowedKeys id ["id"; "subject"; "allowed_levels"; "coverage"; "severity"] row
