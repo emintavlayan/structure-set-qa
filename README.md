@@ -1,23 +1,43 @@
 # structure-set-qa
 
-Anatomy-aware, read-only QA of Eclipse **structure sets**, including individual contours, CT truncation evidence, and spatial relationships between organs.
+Anatomy-aware, read-only quality assurance of a **complete radiotherapy structure set**.
+
+The project evaluates individual contours **and relationships between structures**, including topology, relative anatomical position, CT scan coverage, and (later) vertebral-level comparisons and cohort-derived anatomical reference distributions.
+
+This project remains exclusively **structure-set QA**. It does not assess treatment plan quality or calculate dosimetric metrics.
 
 ## Clinical workflow
 
-1. **Before planning:** dosimetrist opens the Siemens-generated CT structure set; the script measures organ geometry, scan-edge proximity, separate-part count (if exposed by ESAPI), and simple anatomical ordering.
-2. **After planning (planned):** rerun baseline checks and add CTV/PTV, plan, and dose-related rules.
-3. **Statistical learning (planned):** characterize full or partial structures using clinic-approved historical data, including spine-relative features and conditional reference ranges.
+1. **Initial contour review:** before treatment planning, inspect the available structure set and flag suspicious anatomy, isolated contour components, and possible scan truncation.
+2. **Extended structure review (planned):** run structure-set QA again after additional structures have been created, including CTV and PTV. This stage adds structure/target geometry checks; it does not analyze the treatment plan or dose.
+3. **Population learning (planned):** compare appropriately categorized structures against anatomical distributions learned from clinic-approved reference data, after the necessary permissions.
 
-The QA report is **advisory**, not approval or automatic contour correction. This is a research/development prototype, **not validated for clinical decision-making**.
+Both reviews operate on **the structure set**, not on treatment-plan data.
 
-## Layout
+## Architecture
 
-- `src/StructureSetQa.Core/Domain.fs` — typed anatomy, rules, findings
-- `src/StructureSetQa.Core/Knowledge.fs` — initial fixed-ID Siemens rule catalog
-- `src/StructureSetQa.Core/Analysis.fs` — pure QA engine
-- `src/StructureSetQa.Esapi/EsapiReader.fs` — read-only ScriptContext adapter
-- `src/StructureSetQa.Esapi/Workflow.fs` — pre-planning workflow
-- `tests/StructureSetQa.Core.Tests/AnalysisTests.fs` — synthetic tests
+- `src/StructureSetQa.Core/Domain.fs` — types describing structures, measurements, QA rule definitions, and findings
+- `src/StructureSetQa.Core/Knowledge.fs` — initial provisional structure IDs and typed anatomical rule catalogue
+- `src/StructureSetQa.Core/Analysis.fs` — pure, vendor-independent rule evaluation
+- `src/StructureSetQa.Esapi/EsapiReader.fs` — current read-only ESAPI structure-set and CT adapter
+- `src/StructureSetQa.Esapi/Workflow.fs` — current initial-review orchestration
+- `tests/StructureSetQa.Core.Tests/AnalysisTests.fs` — synthetic tests, without patient data
+
+The domain and rule engine do not depend on Eclipse or any auto-contouring vendor. **The current integration** targets an Eclipse **ESAPI plug-in script**, using the active `ScriptContext.StructureSet`. The adapter is under development; a launchable plug-in entry point and report UI are not yet present.
+
+## Coordinate conventions
+
+Preserve the original **XYZ millimetre coordinates supplied by ESAPI**, without introducing a custom axis order or changing signs:
+
+| Axis | Anatomical dimension | Increasing DICOM patient coordinate |
+|---|---|---|
+| X | Left–right | Left |
+| Y | Anterior–posterior | Posterior |
+| Z | Inferior–superior | Superior |
+
+The implementation uses **ESAPI-returned DICOM patient coordinates**, which differ from the user-defined planning coordinate display in the Eclipse UI. Position comparisons and scan-boundary checks use source XYZ directly. See [Varian ESAPI coordinate documentation](https://docs.developer.varian.com/articles/15.6/05_Eclipse_Scripting_API_Object_Model.html) and [DICOM PS3.3](https://dicom.nema.org/medical/DICOM/current/output/chtml/part03/sect_C.7.6.2.html).
+
+There is no X/Y swap, AP sign inversion, spine-relative origin, or automatic coordinate normalization in the first implementation. Spine-relative measurements may be added later as **derived features**, without altering original positions.
 
 ## Development
 
@@ -25,22 +45,17 @@ The QA report is **advisory**, not approval or automatic contour correction. Thi
 dotnet test tests/StructureSetQa.Core.Tests/StructureSetQa.Core.Tests.fsproj
 ```
 
-The core targets .NET Standard 2.0; pure tests target .NET 8. The ESAPI boundary requires vendor assemblies and a configured clinical development machine.
+The pure core targets .NET Standard 2.0 and the tests target .NET 8. The ESAPI adapter requires the compatible vendor assemblies and .NET Framework configuration on a development workstation.
 
-## Modeling decisions
+## Current status and limitations
 
-- Patient coordinates: **X anterior, Y left, Z superior**, millimetres; adapter converts DICOM LPS.
-- Structure definitions hold fixed source IDs and nested intrinsic, relative, vertebral rule definitions.
-- Measurements remain distinct from anatomical interpretations.
-- Contact with a CT grid boundary is possible truncation evidence, not proof.
-- Unknown vertebral mapping produces NotEvaluated.
-- No Eclipse modifications, patient exports, or patient datasets.
+- Source is committed, but compilation and ESAPI integration have **not** been executed in this environment.
+- Example source structure IDs and clinical thresholds need local confirmation; they are not yet validated clinical rules.
+- Component count uses ESAPI's method if available in the installed version; otherwise the check is not evaluated.
+- Scan-boundary proximity provides possible truncation evidence, not proof of contour incompleteness.
+- Oblique image grid-face clearance is not yet evaluated.
+- Vertebral rules have type definitions but no labeled-vertebra evaluation yet.
+- Extended CTV/PTV rules, editable YAML knowledge, and population learning are future work.
+- The code reads data only; it never changes or approves contours.
 
-## Current limitations
-
-- Actual Siemens structure IDs and clinical margins require local confirmation.
-- Separate-part ESAPI method availability depends on vendor version.
-- Oblique CT grid-face clearance is currently not evaluated.
-- Vertebral rules are modeled but not executed until labeled landmarks exist.
-- This code is not yet compiled or clinically validated here.
-- YAML and post-planning checks are planned.
+**Research/development prototype — not clinically validated.**
