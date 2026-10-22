@@ -12,6 +12,21 @@ It is **only structure-set QA**. It does not inspect plan quality, dose, or beam
 
 The current integration is an **Eclipse ESAPI read-only plug-in script adapter**, with actual plug-in entry point and UI still to be developed. The core does not depend on Eclipse or any auto-contouring vendor.
 
+## Run locally without Eclipse
+
+Clone the repo, then run the vendor-independent F# tests and command-line tools:
+
+```powershell
+dotnet test tests/StructureSetQa.Core.Tests/StructureSetQa.Core.Tests.fsproj
+dotnet run --project src/StructureSetQa.Cli -- validate
+dotnet run --project src/StructureSetQa.Cli -- inventory samples/structure-ids.txt
+dotnet run --project src/StructureSetQa.Cli -- demo
+```
+
+The `demo` command uses synthetic organ centers and deliberate contour anomalies. It does **not** connect to an active treatment planning system.
+
+See [local setup and CLI guide](docs/LOCAL.md) for prerequisites and Windows/Neovim development steps.
+
 ## Clinician-editable QA rules
 
 | File | Contains |
