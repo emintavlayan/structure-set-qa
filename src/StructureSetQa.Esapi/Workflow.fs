@@ -27,17 +27,23 @@ module Workflow =
             return! Knowledge.fromYaml naming geometry relationships vertebrae
         }
 
-    /// Runs initial structure-set QA without inspecting treatment-plan or dose data.
-    let runInitialReview directory (scriptContext: ScriptContext) : Result<QaReport, string> =
+    /// Runs initial QA and returns both the report and immutable extracted measurements.
+    let runInitialReviewDetailed directory (scriptContext: ScriptContext) : Result<QaReport * AnatomySnapshot, string> =
         result {
             let! knowledge = loadKnowledge directory
             let! snapshot = EsapiReader.readSnapshot scriptContext knowledge
             let findings = Analysis.evaluate knowledge snapshot
 
-            return {
+            let report = {
                 Stage = InitialContourReview
                 StructureSetId = snapshot.StructureSetId
                 Inventory = snapshot.Inventory
                 Findings = findings
             }
+            return report, snapshot
         }
+
+    /// Returns the initial structure-set QA report to callers that do not need measurements.
+    let runInitialReview directory (scriptContext: ScriptContext) : Result<QaReport, string> =
+        runInitialReviewDetailed directory scriptContext
+        |> Result.map fst
