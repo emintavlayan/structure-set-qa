@@ -1,0 +1,13 @@
+# Synthetic naming test — one structure ID per line.
+# This file contains no clinical or patient information.
+Rektum
+Kidney_L
+Kidney_R
+Heart
+Lung_L
+Lung_R
+VB_T9
+Vertebra_T10
+Spinal_Cord
+Kidney_L_PRV
+PTV_70
