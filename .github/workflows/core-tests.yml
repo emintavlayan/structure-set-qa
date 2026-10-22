@@ -1,4 +1,4 @@
-name: Core F# tests
+name: F# core and local CLI
 on:
   push:
     branches: [main]
@@ -12,5 +12,11 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      - name: Restore and run vendor-independent tests
+      - name: Run vendor-independent F# tests
         run: dotnet test tests/StructureSetQa.Core.Tests/StructureSetQa.Core.Tests.fsproj --configuration Release
+      - name: Validate clinician rulebooks locally
+        run: dotnet run --project src/StructureSetQa.Cli --configuration Release -- validate
+      - name: Inventory sample structure IDs
+        run: dotnet run --project src/StructureSetQa.Cli --configuration Release -- inventory samples/structure-ids.txt
+      - name: Execute synthetic structure-set QA
+        run: dotnet run --project src/StructureSetQa.Cli --configuration Release -- demo
